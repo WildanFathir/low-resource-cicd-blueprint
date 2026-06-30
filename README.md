@@ -15,7 +15,7 @@
 
 _Originally designed and implemented as part of the undergraduate thesis:_
 _"Perancangan dan Implementasi Arsitektur CI/CD Pada Lingkungan Low Resource Server Pada Proyek Aplikasi Web Presensi Cimalaka"_
-_— Wildan Fathir Qinthara, Universitas Sebelas April (UNSAP)_
+_— Wildan Fathir Qinthara_
 
 </div>
 
@@ -498,8 +498,7 @@ You are free to use, copy, modify, merge, publish, distribute, sublicense, and s
 
 **Built with academic rigor. Shared with open-source spirit.**
 
-_Wildan Fathir Qinthara — Universitas Sebelas April (UNSAP)_
-_Cimalaka, West Java, Indonesia_
+_Wildan Fathir Qinthara_
 
 ---
 
