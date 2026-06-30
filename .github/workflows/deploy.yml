@@ -1,0 +1,184 @@
+name: Build & Push & Deploy Application
+
+# Triggers automation when a production version tag is pushed.
+# You can customize the tag pattern matching to fit your specific project requirements.
+
+on:
+  push:
+    tags:
+      - 'v*-prod'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest # Executed utilizing an external cloud runner architecture to protect server resources.
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4 # Downloads the codebase repository to the cloud runner environment.
+
+      # This step is optional; it can be removed if your target project does not require a .env file.
+      - name: Inject Environment Variables (.env)
+        run: |
+          rm -f .env
+          printf "%s" "${{ secrets.ENV_FILE }}" > .env
+
+      # =========================================================================
+      # 🛠️ SECTION: ENVIRONMENT SETUP (CHOOSE THE APPLICATION STACK RELEVANT TO YOUR PROJECT)
+      # =========================================================================
+      # Please uncomment the specific stack setup block that matches your environment and remove/comment out the rest.
+
+      # --- OPTION 1: PHP & NODE.JS STACK (Laravel, Symfony + Vite/Mix Blueprint) ---
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2' # Adjust the target PHP version required by your application.
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, dom, filter, gd, json, zip
+          tools: composer:v2
+
+      - name: Setup Node.js (Frontend)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22' # Set the appropriate Node.js version environment.
+
+      - name: Install Dependencies & Build Assets (PHP/Node)
+        run: |
+          composer install --no-dev --optimize-autoloader --no-interaction
+          npm install
+          npm run build
+
+      # --- OPTION 2: PYTHON STACK (Django, FastAPI, Flask Blueprint) ---
+      # - name: Setup Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: '3.11' # Adjust the specific Python runtime version
+      # - name: Install Python Dependencies
+      #   run: |
+      #     python -m pip install --upgrade pip
+      #     pip install -r requirements.txt
+
+      # --- OPTION 3: GOLANG STACK ---
+      # - name: Setup Go
+      #   uses: actions/setup-go@v5
+      #   with:
+      #     go-version: '1.22' # Adjust the target Go environment core version
+      # - name: Build Go Binary
+      #   run: go build -v -o main .
+
+      # --- OPTION 4: PURE STATIC FRONTEND (React, Vue, Angular, Next.js SSG Blueprint) ---
+      # - name: Setup Node.js Only
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: "22"
+      # - name: Build Frontend Assets
+      #   run: |
+      #     npm install
+      #     npm run build
+
+      # =========================================================================
+      # 🐳 SECTION: DOCKER CONTAINERIZATION (GHCR PUBLICATION PHASE)
+      # =========================================================================
+
+      - name: Setup Docker Build Environment
+        uses: docker/setup-buildx-action@v3 # Prepares the Docker Buildx builder instance environment.
+
+      - name: Convert Username to Lowercase
+        id: vars
+        run: echo "actor_lc=$(echo '${{ github.actor }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3 # Performs explicit cloud registry authentication to GHCR.
+        with:
+          registry: ghcr.io
+          username: ${{ steps.vars.outputs.actor_lc }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push Docker Image to GHCR
+        uses: docker/build-push-action@v5 # Compiles the container image and publishes it to GitHub Container Registry.
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ steps.vars.outputs.actor_lc }}/${{ github.event.repository.name }}:${{ github.ref_name }}
+
+      # =========================================================================
+      # 🚀 SECTION: REMOTE CD SSH DEPLOYMENT TO TARGET SERVER
+      # =========================================================================
+
+      - name: Deploy Application to Server via SSH
+        uses: appleboy/ssh-action@v1.0.3 # Establishes remote shell access connections over target secure host endpoints.
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+
+            # Automated runtime variables derived dynamically from the GitHub repository context.
+            APP_NAME="${{ github.event.repository.name }}"
+            IMAGE_TAG="${{ github.ref_name }}"
+            ACTOR_LOW="${{ steps.vars.outputs.actor_lc }}"
+
+            NETWORK_NAME="app-internal-net"
+            VOLUME_NAME="app-persistent-storage"
+
+            # Authenticate host terminal environment directly with the package container registry.
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "$ACTOR_LOW" --password-stdin
+
+            # Pull the freshly baked distribution image tag from the centralized remote package instance.
+            docker pull ghcr.io/$ACTOR_LOW/$APP_NAME:$IMAGE_TAG
+
+            # Gracefully terminate any conflicting run container instances bound under identical resource namespaces.
+            docker stop $APP_NAME || true
+            docker rm $APP_NAME || true
+
+            # Standardize underlying isolated networks and persistent volumes namespaces to preserve target system database states.
+            docker network create $NETWORK_NAME || true
+            docker volume create $VOLUME_NAME || true
+
+            # Initialize runtime daemon process containerized architecture.
+            # ⚠️ NOTICE: Adjust the volume path mapping '/var/www/html/storage' to match your specific stack framework directories.
+            docker run -d \
+              --name $APP_NAME \
+              --network $NETWORK_NAME \
+              --restart unless-stopped \
+              -v $VOLUME_NAME:/var/www/html/storage/app/public \
+              ghcr.io/$ACTOR_LOW/$APP_NAME:$IMAGE_TAG
+
+            sleep 5
+
+            # Automatically prune redundant dangling images to prevent local storage allocation exhausts.
+            docker image prune -af
+
+      # =========================================================================
+      # 📊 SECTION: MONITORING NOTIFICATION (DISCORD CHATOPS GATEWAY)
+      # =========================================================================
+
+      - name: Discord Notification Success
+        if: success()
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          args: '# 🎉 **DEPLOYMENT SUCCESSFUL!**
+            **📂 Repository:** ${{ github.repository }}
+            **🏷️ Release Version:** `${{ github.ref_name }}`
+            **🔗 Commit Details:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+
+            ## 🌐 **Access Service**
+            **URL:** https://${{ secrets.DOMAIN_NAME }}
+            **Status:** 🟢 ONLINE'
+
+      - name: Discord Notification Failure
+        if: failure()
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          args: '# ❌ **DEPLOYMENT FAILED!**
+            **📂 Repository:** ${{ github.repository }}
+            **🏷️ Release Version:** `${{ github.ref_name }}`
+            **🔍 Error Logs Tracking:** [View Run Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})'
