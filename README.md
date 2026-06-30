@@ -41,7 +41,7 @@ Modern CI/CD pipelines are almost universally designed with the assumption of **
 
 **This repository is an architectural blueprint** — a reusable, battle-tested CI/CD framework designed from the ground up for the **harshest constraint imaginable in production infrastructure: a single VPS with 1 vCPU and 1 GB of RAM.**
 
-The framework was validated in the context of a real-world web attendance application (_Presensi Cimalaka_) as part of formal undergraduate research at Universitas Sebelas April (UNSAP). The result was a pipeline that achieved **fully automated, zero-downtime deployments** on a server configuration that most CI/CD documentation would consider inadequate for production use.
+The framework was validated in the context of a real-world web attendance application (_Presensi Cimalaka_) as part of formal undergraduate research. The result was a pipeline that achieved **fully automated, zero-downtime deployments** on a server configuration that most CI/CD documentation would consider inadequate for production use.
 
 > **The central engineering challenge:** Running `composer install`, `npm run build`, and `docker build` simultaneously on a 1 GB RAM machine is a guaranteed path to an OOM (Out-Of-Memory) crash. The kernel kills processes indiscriminately. Deployments fail silently. Services go down.
 >
