@@ -232,7 +232,7 @@ git push origin v1.0.0-prod
 
 ### The Philosophy
 
-This project began as a formal academic research artifact — a thesis submitted in partial fulfillment of a Bachelor's degree in Informatics at Universitas Sebelas April. But **research should not die in a PDF**.
+This project began as a formal academic research artifact — a thesis submitted in partial fulfillment of a Bachelor's degree in Information Systems.
 
 The spirit behind this blueprint is borrowed from the same ethos that Linus Torvalds articulated when he posted a note to the Minix newsgroup in 1991: _"I'm doing a (free) operating system (just a hobby, won't be big and professional like gnu)..."_ — and then proceeded to change computing forever, not because he built it alone, but because he opened it to the world.
 
