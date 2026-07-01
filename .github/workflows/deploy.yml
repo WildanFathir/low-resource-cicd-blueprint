@@ -151,7 +151,11 @@ jobs:
             sleep 5
 
             # Automatically prune redundant dangling images to prevent local storage allocation exhausts.
-            docker image prune -af
+            docker images ghcr.io/${{ steps.vars.outputs.actor_lc }}/$APP_NAME \
+              --format '{{.Tag}}\t{{.ID}}' \
+              | grep -v "${{ github.ref_name }}" \
+              | awk '{print $2}' \
+              | xargs -r docker rmi -f || true
 
       # =========================================================================
       # 📊 SECTION: MONITORING NOTIFICATION (DISCORD CHATOPS GATEWAY)
